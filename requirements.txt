@@ -1,0 +1,9 @@
+bidict
+requests_futures
+h5py
+termcolor
+numcodecs==0.15.1
+zarr==2.12.0
+# torch
+# pytorch3d.ops
+# torchvision
