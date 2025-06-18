@@ -1,0 +1,25 @@
+# 详细日志
+VERBOSE: 1
+
+# debugpy 线程调试模式
+THREAD_DEBUG: 0
+
+# 性能测试
+BENCHMARK: 0
+
+# 支持的相机类型： orbbec, realsense
+cam_type: "orbbec"
+
+realsense_group:
+  H: 480
+  W: 640
+  C: 3
+orbbec_group:
+  H: 480
+  W: 640
+  C: 3
+  color_dtype: np.uint8
+  depth_dtype: np.uint16
+  pc_dtype: np.float32
+  USE_COLOR_PC: 1
+  PC_NUM: 102400
