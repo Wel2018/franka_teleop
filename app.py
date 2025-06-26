@@ -2,12 +2,11 @@ import sys
 import threading
 import numpy as np
 from rich import print
-from toolbox.core.time_op import Timecost, get_time_str
+from toolbox.core.time_op import get_time_str
 from toolbox.robot.franka_arm_client import FrankaArmClient, ws_client_loop
 from toolbox.qt import qtbase
 from .ui.ui_form import Ui_DemoWindow
 from .bgtask.robot_collect import RobotCollect
-from .bgtask.robot_cam import RobotCamTask
 from .setting import SettingWindow
 from . import AppConfig, logger, VERBOSE, THREAD_DEBUG, APPCFG
 
@@ -120,21 +119,25 @@ class MainWindow(qtbase.IMainWindow):
         self.zero_img = qtbase.QPixmap(qtbase.cv2qt(zero_img))
         self.reset_viz()
 
-        self.tcost = Timecost(0, 1)
+        #self.tcost = Timecost(0, 1)
         self.pressed_keys = set()
         
         # 摄像头 --------------------
         self.cam_type = APPCFG['cam_type']
         if self.cam_type == "realsense":
-            from toolbox.cam3d.cam3d_realsense import RealsenseCameraDual
-            self.cam = RealsenseCameraDual()
+            from toolbox.cam3d.cam3d_realsense import RealsenseCameraS
+            self.cam = RealsenseCameraS()
         elif self.cam_type == "orbbec":
             from toolbox.cam3d.cam3d_orbbec import OrbbecCamera # type: ignore
             self.cam = OrbbecCamera()
         else:
             raise NotImplementedError
         
-        self.robot_cam_th = RobotCamTask(self.cam)
+        if self.cam.start():
+            self.cam.warmup()
+            
+        self.robot_cam_th = qtbase.CameraTask(
+            qtbase.Camera3DWrapper(self.cam, self.cam_type))
         self.robot_cam_th.bind(on_data=self.get_obs)
         self.add_th(self.TH_CAM, self.robot_cam_th, 1)
         # 机械臂控制 --------------------

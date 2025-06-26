@@ -23,3 +23,8 @@ orbbec_group:
   pc_dtype: np.float32
   USE_COLOR_PC: 1
   PC_NUM: 102400
+
+orbbec_pointcloud_crop:
+  x_range: [-0.5, 0.5]
+  y_range: [-0.5, 0.5]
+  z_range: [-0.5, 0.5]
