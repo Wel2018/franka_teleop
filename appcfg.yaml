@@ -25,6 +25,6 @@ orbbec_group:
   PC_NUM: 102400
 
 orbbec_pointcloud_crop:
-  x_range: [-0.5, 0.5]
-  y_range: [-0.5, 0.5]
-  z_range: [-0.5, 0.5]
+  x_range: [0.0, 1.0]
+  y_range: [-0.4, 0.4]
+  z_range: [-0.06, 1.0]
