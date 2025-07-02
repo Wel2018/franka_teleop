@@ -6,7 +6,7 @@ from toolbox.core.time_op import get_time_str
 from toolbox.robot.franka_arm_client import FrankaArmClient, ws_client_loop
 from toolbox.qt import qtbase
 from .ui.ui_form import Ui_DemoWindow
-from .bgtask.robot_collect import RobotCollect
+from toolbox.robot.robot_collect import FrankaCollector
 from .setting import SettingWindow
 from . import AppConfig, logger, VERBOSE, THREAD_DEBUG, APPCFG
 
@@ -123,23 +123,18 @@ class MainWindow(qtbase.IMainWindow):
         self.pressed_keys = set()
         
         # 摄像头 --------------------
-        self.cam_type = APPCFG['cam_type']
-        if self.cam_type == "realsense":
-            from toolbox.cam3d.cam3d_realsense import RealsenseCameraS
-            self.cam = RealsenseCameraS()
-        elif self.cam_type == "orbbec":
-            from toolbox.cam3d.cam3d_orbbec import OrbbecCamera # type: ignore
-            self.cam = OrbbecCamera()
-        else:
-            raise NotImplementedError
-        
-        if self.cam.start():
-            self.cam.warmup()
-            
+        self.camtype = APPCFG['camtype']
+        from toolbox.cam3d import load_cam3d
+        self.cam = load_cam3d(
+            self.camtype, 
+            camtypes_for_S_mode=APPCFG['camtypes_for_S_mode'],
+            is_start_and_warmup=1
+        )
         self.robot_cam_th = qtbase.CameraTask(
-            qtbase.Camera3DWrapper(self.cam, self.cam_type))
+            qtbase.Camera3DWrapper(self.cam))
         self.robot_cam_th.bind(on_data=self.get_obs)
         self.add_th(self.TH_CAM, self.robot_cam_th, 1)
+        
         # 机械臂控制 --------------------
         self.arm = FrankaArmClient()
         self.arm.goto_init_pos()
@@ -167,7 +162,7 @@ class MainWindow(qtbase.IMainWindow):
             self.is_collect_data = 1
             self.set_op_cmd("collect")
             self.add_log("开启数据采集模式")
-            self.robot_collect = RobotCollect(SharedData, self.cam, self.arm)
+            self.robot_collect = FrankaCollector(self.cam, self.arm, use_kb_incr=1, incr=SharedData.incr)
             self.robot_collect.bind(on_msg=self.add_log)
             self.add_th(self.TH_COLLECT, self.robot_collect, 1)
         else:
@@ -182,20 +177,7 @@ class MainWindow(qtbase.IMainWindow):
 
     def open_cam(self):
         """启动和关闭摄像头可视化"""
-        if not self.is_cam_opened:
-            # cam1id = int(self.ui.cam1id.text())
-            # cam2id = int(self.ui.cam2id.text())
-            # self.add_log(f"打开本地相机 {cam1id, cam2id}")
-            # self.robot_cam = RobotCamLocal(dict(cam1id=cam1id, cam2id=cam2id))
-            # self.robot_cam.bind(on_data=self.get_obs)
-            # self.add_th(self.TH_CAM, self.robot_cam, 1)
-            ...
-        else:
-            #self.stop_th(self.TH_CAM)
-            self.add_log(f"关闭本地相机")
-            self.reset_viz()
-        
-        self.is_cam_opened = not self.is_cam_opened
+        ...
 
 
     def set_gripper(self):
@@ -255,7 +237,7 @@ class MainWindow(qtbase.IMainWindow):
             self.is_collect_data = 1
             self.set_op_cmd("collect")
             self.add_log("开启数据采集模式")
-            self.robot_collect = RobotCollect(SharedData, self.cam, self.arm)
+            self.robot_collect = FrankaCollector(self.cam, self.arm)
             self.robot_collect.bind(on_msg=self.add_log)
             self.add_th(self.TH_COLLECT, self.robot_collect, 1)
 

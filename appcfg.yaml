@@ -8,7 +8,8 @@ THREAD_DEBUG: 0
 BENCHMARK: 0
 
 # 支持的相机类型： orbbec, realsense
-cam_type: "orbbec"
+camtype: "L515"
+camtypes_for_S_mode: ["D435", "D405"]
 
 realsense_group:
   H: 480
