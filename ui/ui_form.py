@@ -164,26 +164,26 @@ class Ui_DemoWindow(object):
 
         self.horizontalLayout_10.addWidget(self.label_2)
 
-        self.radioButton = QRadioButton(self.centralwidget)
-        self.radioButton.setObjectName(u"radioButton")
-        self.radioButton.setChecked(True)
+        self.rb_keyboard = QRadioButton(self.centralwidget)
+        self.rb_keyboard.setObjectName(u"rb_keyboard")
+        self.rb_keyboard.setChecked(True)
 
-        self.horizontalLayout_10.addWidget(self.radioButton)
+        self.horizontalLayout_10.addWidget(self.rb_keyboard)
 
-        self.radioButton_2 = QRadioButton(self.centralwidget)
-        self.radioButton_2.setObjectName(u"radioButton_2")
+        self.rb_spacemouse = QRadioButton(self.centralwidget)
+        self.rb_spacemouse.setObjectName(u"rb_spacemouse")
 
-        self.horizontalLayout_10.addWidget(self.radioButton_2)
+        self.horizontalLayout_10.addWidget(self.rb_spacemouse)
 
-        self.radioButton_3 = QRadioButton(self.centralwidget)
-        self.radioButton_3.setObjectName(u"radioButton_3")
+        self.rb_iphone = QRadioButton(self.centralwidget)
+        self.rb_iphone.setObjectName(u"rb_iphone")
 
-        self.horizontalLayout_10.addWidget(self.radioButton_3)
+        self.horizontalLayout_10.addWidget(self.rb_iphone)
 
-        self.radioButton_4 = QRadioButton(self.centralwidget)
-        self.radioButton_4.setObjectName(u"radioButton_4")
+        self.rb_io = QRadioButton(self.centralwidget)
+        self.rb_io.setObjectName(u"rb_io")
 
-        self.horizontalLayout_10.addWidget(self.radioButton_4)
+        self.horizontalLayout_10.addWidget(self.rb_io)
 
 
         self.verticalLayout_2.addLayout(self.horizontalLayout_10)
@@ -383,10 +383,10 @@ class Ui_DemoWindow(object):
 #endif // QT_CONFIG(statustip)
         self.btn_setting.setText(QCoreApplication.translate("DemoWindow", u"\u8bbe\u7f6e", None))
         self.label_2.setText(QCoreApplication.translate("DemoWindow", u"\u6a21\u5f0f", None))
-        self.radioButton.setText(QCoreApplication.translate("DemoWindow", u"\u952e\u76d8", None))
-        self.radioButton_2.setText(QCoreApplication.translate("DemoWindow", u"SpaceMouse", None))
-        self.radioButton_3.setText(QCoreApplication.translate("DemoWindow", u"iPhone", None))
-        self.radioButton_4.setText(QCoreApplication.translate("DemoWindow", u"IO \u52a8\u6355", None))
+        self.rb_keyboard.setText(QCoreApplication.translate("DemoWindow", u"\u952e\u76d8", None))
+        self.rb_spacemouse.setText(QCoreApplication.translate("DemoWindow", u"SpaceMouse", None))
+        self.rb_iphone.setText(QCoreApplication.translate("DemoWindow", u"iPhone", None))
+        self.rb_io.setText(QCoreApplication.translate("DemoWindow", u"IO \u52a8\u6355", None))
         self.is_keyboard_ctrl.setText(QCoreApplication.translate("DemoWindow", u"\u9065\u64cd\u4f5c\u4f7f\u80fd", None))
         self.is_collect_data.setText(QCoreApplication.translate("DemoWindow", u"\u91c7\u96c6\u8f68\u8ff9", None))
         self.label_3.setText(QCoreApplication.translate("DemoWindow", u"\u63a7\u5236\u72b6\u6001", None))

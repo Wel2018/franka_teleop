@@ -221,7 +221,7 @@
              </widget>
             </item>
             <item>
-             <widget class="QRadioButton" name="radioButton">
+             <widget class="QRadioButton" name="rb_keyboard">
               <property name="text">
                <string>键盘</string>
               </property>
@@ -231,21 +231,21 @@
              </widget>
             </item>
             <item>
-             <widget class="QRadioButton" name="radioButton_2">
+             <widget class="QRadioButton" name="rb_spacemouse">
               <property name="text">
                <string>SpaceMouse</string>
               </property>
              </widget>
             </item>
             <item>
-             <widget class="QRadioButton" name="radioButton_3">
+             <widget class="QRadioButton" name="rb_iphone">
               <property name="text">
                <string>iPhone</string>
               </property>
              </widget>
             </item>
             <item>
-             <widget class="QRadioButton" name="radioButton_4">
+             <widget class="QRadioButton" name="rb_io">
               <property name="text">
                <string>IO 动捕</string>
               </property>

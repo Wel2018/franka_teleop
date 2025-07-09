@@ -1,5 +1,11 @@
+##################################
+# franka_teleop app config
+# author: wel2018
+# date: 2025-07-09
+##################################
+
 # 详细日志
-VERBOSE: 1
+VERBOSE: 0
 
 # debugpy 线程调试模式
 THREAD_DEBUG: 0
@@ -7,25 +13,11 @@ THREAD_DEBUG: 0
 # 性能测试
 BENCHMARK: 0
 
-# 支持的相机类型： orbbec, realsense
+# 相机型号
 camtype: "L515"
+
+# 多相机列表（多相机需要设置 camtype: "S"，该字段才生效）
 camtypes_for_S_mode: ["D435", "D405"]
 
-realsense_group:
-  H: 480
-  W: 640
-  C: 3
-orbbec_group:
-  H: 480
-  W: 640
-  C: 3
-  color_dtype: np.uint8
-  depth_dtype: np.uint16
-  pc_dtype: np.float32
-  USE_COLOR_PC: 1
-  PC_NUM: 102400
-
-orbbec_pointcloud_crop:
-  x_range: [0.0, 1.0]
-  y_range: [-0.4, 0.4]
-  z_range: [-0.06, 1.0]
+# 遥操作设置
+spacemouse_speed_ratio: 0.3

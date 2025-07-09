@@ -8,8 +8,8 @@ from toolbox.core.file_op import yaml_load
 AppConfig = qtbase.QAppConfig(
     name = "Franka 遥操作数据采集程序",
     name_en = "Franka Teleop",
-    date="2025-07-02",
-    version = "1.0.1",
+    date="2025-07-09",
+    version = "1.1.0",
     fontsize = 14
 )
 print(f"AppConfig={AppConfig}")

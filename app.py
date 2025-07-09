@@ -3,7 +3,7 @@ import threading
 import numpy as np
 from rich import print
 from toolbox.core.time_op import get_time_str
-from toolbox.robot.franka_arm_client import FrankaArmClient, ws_client_loop
+from toolbox.robot.franka_arm_client import FrankaArmClient
 from toolbox.qt import qtbase
 from .ui.ui_form import Ui_DemoWindow
 from toolbox.robot.robot_collect import FrankaCollector
@@ -12,6 +12,7 @@ from . import AppConfig, logger, VERBOSE, THREAD_DEBUG, APPCFG
 
 
 class SharedData:
+    """共享数据"""
     incr = {
         "x": .0,
         "y": .0, 
@@ -24,32 +25,30 @@ class SharedData:
     incr_bak = {}
 
 
+class WorkMode:
+    """遥操作工作模式"""
+    keyboard = 0
+    spacemouse = 1
+    iphone = 2
+    io = 3
+
+
 class MainWindow(qtbase.IMainWindow):
     """应用具体实现"""
     # 定时器和线程名称
-    TH_CAM = "cam"
-    TH_SCENE_DESC = "scene_desc"
     TH_COLLECT = "collect"
     TH_SYNC = "sync"
+    TH_CAM = "cam3d"
+    TH_CTL_MODE = "teleop_ctl_mode"
     TIMER_ROBOT_STATE = "robot_state"
-    TIMER_VAL_ERR = "val_err"
 
     is_quit_confirm = 0  # 程序退出确认
     is_keyboard_ctrl = 1  # 键盘控制开关
     is_collect_data = 0  # 数据集收集开关
-    is_sync_real = 0  # 是否开启双向同步
     is_gripper_open = 1  # 当前夹爪状态
-    is_cam_opened = 0  # 当前摄像头状态
-    is_val_err = 0  # 是否开启 sim2real 双向同步误差验证
-    is_net_ok = 0  # 当前网络状态
-    is_voice = 0  # 语音输入开关
-    is_scene_desc = 0  # 使用视觉大模型理解当前场景
-    is_ai_task_type = 1  # 使用豆包大模型自动确定任务类型
     is_debug = 0
     is_going_to_init_pos = 0
     VERBOSE = VERBOSE
-
-    is_running_vel_ctl = 0
 
     def __init__(self, parent = None):
         ui = self.ui = Ui_DemoWindow()
@@ -66,7 +65,7 @@ class MainWindow(qtbase.IMainWindow):
 
         # 子页面
         self.setting_wd = SettingWindow(self)
-        self.mapp = self.setting_wd.keyboard_mapp
+        self.kb_mapp = self.setting_wd.keyboard_mapp
 
         # 绑定点击事件
         self.bind_clicked(ui.btn_setting, lambda: self.setting_wd.showNormal())
@@ -83,20 +82,23 @@ class MainWindow(qtbase.IMainWindow):
         # self.set_app_icon("data/assets/franky.svg")
         # qtbase.QGuiOperate.label_set(ui.msg, "styled", "0")
 
-        # 添加任务类型
-        # ui.task_type.addItems(llm_prompt['task_type'].values())
-
         # 设置勾选状态
         self.set_check(ui.is_keyboard_ctrl, self.is_keyboard_ctrl)
         self.set_check(ui.is_collect_data, self.is_collect_data)
+        self.set_check(ui.rb_keyboard, 1)
         
         # 勾选框glob
         self.bind_checked(ui.is_keyboard_ctrl, self.keyboard_ctl)
         self.bind_checked(ui.is_collect_data, self.collect_data)
         
-        # 在初始化时先手动触发一次
-        # self.val_err(ui.is_val_err.checkState().value)
-
+        # 监听工作模式选择
+        for rb in [ui.rb_keyboard, ui.rb_spacemouse, ui.rb_iphone, ui.rb_io]:
+            rb.clicked.connect(self.ctl_mode_changed)
+        # 默认工作模式
+        self.set_enable(ui.rb_iphone, 0)
+        self.set_enable(ui.rb_io, 0)
+        self.mode = WorkMode.keyboard
+        
         # 遥操作控制步长改变
         # 线速度、角速度
         self.pos_vel = ui.step_posi_vel.value()
@@ -106,12 +108,14 @@ class MainWindow(qtbase.IMainWindow):
         # 在 lambda 表达式中不能使用赋值语句（=）。
         self.bind_val_changed(
             ui.step_posi_vel, 
-            lambda val: setattr(self, 'pos_vel', round(val,3))
+            lambda val: \
+                setattr(self, 'pos_vel', round(val,3))
         )
         
         self.bind_val_changed(
             ui.step_angle_vel, 
-            lambda val: setattr(self, 'rot_vel', round(val,3))
+            lambda val: \
+                setattr(self, 'rot_vel', round(val,3))
         )
 
         # 摄像头
@@ -137,24 +141,94 @@ class MainWindow(qtbase.IMainWindow):
         
         # 机械臂控制 --------------------
         self.arm = FrankaArmClient()
-        self.arm.goto_init_pos()
-        
-        # 实时拉取机械臂状态
-        if self.arm.is_connected:
-            self.ws_thread = threading.Thread(target=ws_client_loop, args=(self.arm,), daemon=True)
-            self.ws_thread.start()
+        self.arm.gozero()
         
         self.add_log("程序初始化完成")
+        
         # 检查服务器是否能够正常连接
-        # self.add_timer(self.TIMER_ROBOT_STATE, 100, self.refresh_state, 1)
+        self.add_timer(self.TIMER_ROBOT_STATE, 100, self.refresh_state, 1)
     
+    def get_ctl_mode(self):
+        ui = self.ui
+        if ui.rb_keyboard.isChecked():
+            return WorkMode.keyboard
+        elif ui.rb_spacemouse.isChecked():
+            return WorkMode.spacemouse
+        elif ui.rb_iphone.isChecked():
+            return WorkMode.iphone
+        elif ui.rb_io.isChecked():
+            return WorkMode.io
+        else:
+            raise ValueError("未知控制模式")
+
+    def ctl_mode_changed(self):
+        """启动空间鼠标控制"""
+        ui = self.ui
+        self.is_collect_data = 0
+        mode = self.get_ctl_mode()
+        if mode == self.mode:
+            self.add_log("请点击不同工作模式")
+            return
+        
+        # 停止之前的任务线程
+        self.stop_th(self.TH_CTL_MODE)
+        
+        if mode == WorkMode.keyboard:
+            self.add_log("键盘控制")
+            
+        elif mode == WorkMode.spacemouse:
+            self.add_log("SpaceMouse 控制")
+            from .bgtask.spacemouse import SpaceMouseListener
+            self.spacemouse_th = SpaceMouseListener()
+            self.spacemouse_th.bind(on_data=self.spacemouse_cb, on_msg=self.add_log)
+            self.add_th(self.TH_CTL_MODE, self.spacemouse_th, 1)
+        
+        elif mode == WorkMode.iphone:
+            self.add_log("iPhone 控制 [暂不支持]")
+        
+        elif mode == WorkMode.io:
+            self.add_log("IO 控制 [暂不支持]")
+        else:
+            raise ValueError("未知控制模式 [暂不支持]")
+        self.mode = mode
+
+    @qtbase.Slot(dict)
+    def spacemouse_cb(self, data: dict):
+        # print(f"{get_time_str(2)} data={data}")
+        # self.cmd2incr(data, data)
+        # 所有按键的数据都已同步
+        incr = SharedData.incr
+        
+        # 将 spacemouse 数据格式转为 incr 字典
+        _incr = {}
+        for k in ['x','y','z']:
+            _incr[k] = data[k] if data[k] else 0
+        for k in ['R','P','Y']:
+            _incr[k] = data[k] if data[k] else 0
+        
+        # 判断是否和之前的数值相同
+        is_same = 1
+        for k in ['x','y','z','R','P','Y']:
+            if incr[k] != _incr[k]:
+                is_same = 0
+                break
+        
+        if is_same:
+            return
+        
+        _incr.update({
+            "duration": self.max_duration,
+            "is_async": 1,
+        })
+        # print(f"{get_time_str(2)} {_incr}")
+        self.arm.cartesian_velocity_control(_incr)
+        SharedData.incr.update(_incr)
+        
 
     def play(self):
         """执行任务理解逻辑"""
         self.add_log("回到默认位置")
-        # self.arm.goto_init_pos()
-        # self.robot_brain.msg = self.task_desc
-        # self.add_th("robot_brain", self.robot_brain, 1)
+        self.arm.goto_init_pos()
 
     def kb_collect(self):
         # 开始收集
@@ -174,11 +248,6 @@ class MainWindow(qtbase.IMainWindow):
     def cam_search(self):
         self.cam_s = qtbase.CameraSearcher()
         self.cam_s.show()
-
-    def open_cam(self):
-        """启动和关闭摄像头可视化"""
-        ...
-
 
     def set_gripper(self):
         """夹爪控制"""
@@ -217,7 +286,7 @@ class MainWindow(qtbase.IMainWindow):
             self.set_timer(self.TIMER_ROBOT_STATE, 3000)
 
     def keyboard_ctl(self, state):
-        # print(state) # 0 未勾选, 1 半勾选, 2 勾选
+        #state: 0 未勾选, 1 半勾选, 2 勾选
         if state == 2:
             self.is_keyboard_ctrl = 1
             self.add_log("开启遥操作模式")
@@ -226,27 +295,8 @@ class MainWindow(qtbase.IMainWindow):
             self.add_log("关闭遥操作模式")
         
     def collect_data(self, state):
-        # if not self.is_cam_opened:
-            # self.msgbox("条件不满足，无法勾选")
-            # self.ui.is_collect_data.setChecked(False)
-            # self.ui.is_collect_data.setCheckState(qtbase.Qt.CheckState.Unchecked)
-            # self.add_log("请先打开摄像头", color="red")
-            # return
+        self.kb_collect()
         
-        if state == 2:
-            self.is_collect_data = 1
-            self.set_op_cmd("collect")
-            self.add_log("开启数据采集模式")
-            self.robot_collect = FrankaCollector(self.cam, self.arm)
-            self.robot_collect.bind(on_msg=self.add_log)
-            self.add_th(self.TH_COLLECT, self.robot_collect, 1)
-
-        else:
-            self.is_collect_data = 0
-            self.set_op_cmd("")
-            self.add_log("关闭数据采集模式")
-            self.stop_th(self.TH_COLLECT)
-
 
     def cmd2incr(self, data: dict, cmd: str):
         """根据命令执行动作 
@@ -322,8 +372,8 @@ class MainWindow(qtbase.IMainWindow):
     
     def get_cmd(self, key: str):
         # +x, -x, ...
-        if key in self.mapp.inverse.keys():
-            cmd = self.mapp.inverse[key]
+        if key in self.kb_mapp.inverse.keys():
+            cmd = self.kb_mapp.inverse[key]
             return cmd
         return ""
         
@@ -390,8 +440,8 @@ class MainWindow(qtbase.IMainWindow):
             self.arm.cartesian_velocity_control(incr)
 
         return super().keyPressEvent(event)
-        
-    #@benchmark(bool(1))
+    
+    
     def keyReleaseEvent(self, event):
         """松开按键"""
         if not self.is_keyboard_ctrl:
@@ -444,7 +494,6 @@ class MainWindow(qtbase.IMainWindow):
         # res = api.set_data("op", cmd)
 
     def get_obs(self, frames: dict):
-        # if not frames['ret']: return
         self.pix_left = qtbase.QPixmap(qtbase.cv2qt(frames['v1']))
         self.pix_right = qtbase.QPixmap(qtbase.cv2qt(frames['v2']))
 
