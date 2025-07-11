@@ -58,6 +58,7 @@ class SpaceMouseListener(qtbase.QAsyncTask):
     - 'SpacePilot', 1133, 50725
     - 'SpacePilot Pro', 1133, 50729
     """
+    POSE_KEYS = ['x', 'y', 'z', 'R', 'P', 'Y']
     
     def __init__(self, conf: dict = {}):
         super().__init__(conf)
@@ -72,12 +73,50 @@ class SpaceMouseListener(qtbase.QAsyncTask):
             print("空间鼠标未连接")
         self.is_run = 0
         self.speed_ratio = APPCFG['spacemouse_speed_ratio']
+        self.sigs = {
+            "gripper": 0,
+            "gozero": 0,
+            "collect": 0,
+        }
+        # self.btn2 = 0
+        
+    def _get_button_state(self, state: pyspacemouse.SpaceNavigator):
+        _start_id = 5
+        btn1 = state.buttons[_start_id]
+        btn2 = state.buttons[_start_id+1]
+        btn3 = state.buttons[_start_id+2]
+        btn4 = state.buttons[_start_id+3]
+        return {
+            "gripper": btn1,  # [1] 用来控制夹爪开闭
+            "gozero": btn2,   # [2] 用来控制回到零位
+            "collect": btn3,  # [3] 用来控制数据录制开关
+            "custom": btn4,   # [4] 用来控制自定义功能
+        }
+    
+    def _trigger_01(self, state: pyspacemouse.SpaceNavigator):
+        """记录连续两帧的状态，当出现 0-1 跳变时触发控制信号"""
+        btn_state = self._get_button_state(state)
+    
+        def _impl(slot='gripper'):
+            if self.sigs[slot] == 0 and btn_state[slot] == 1:
+                self.sigs[slot] = 1
+                return 1
+            elif self.sigs[slot] == 1 and btn_state[slot] == 0:
+                self.sigs[slot] = 0
+                return 0
+            return 0
+    
+        return {
+            "gripper": _impl('gripper'),
+            "gozero": _impl('gozero'),
+            "collect": _impl('collect'),
+        }
+    
     
     def run(self):
         self.is_run = 1
         while self.is_run:
             state: pyspacemouse.SpaceNavigator = pyspacemouse.read()  # type: ignore
-            buttons = state.buttons # type: ignore
             # R: roll 滚转，沿着 x 轴
             # P: pitch 俯仰，沿着 y 轴
             # Y: yaw 偏航，沿着 z 轴
@@ -91,8 +130,9 @@ class SpaceMouseListener(qtbase.QAsyncTask):
             }
             
             # 控制速度
-            for k in data.keys():
+            for k in self.POSE_KEYS:
                 data[k] *= self.speed_ratio
             
+            data.update(self._trigger_01(state))
             self.sig_data.emit(data)
             time.sleep(0.01)

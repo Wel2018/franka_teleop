@@ -9,6 +9,7 @@ from .ui.ui_form import Ui_DemoWindow
 from toolbox.robot.robot_collect import FrankaCollector
 from .setting import SettingWindow
 from . import AppConfig, logger, VERBOSE, THREAD_DEBUG, APPCFG
+from .bgtask.spacemouse import SpaceMouseListener
 
 
 class SharedData:
@@ -178,7 +179,6 @@ class MainWindow(qtbase.IMainWindow):
             
         elif mode == WorkMode.spacemouse:
             self.add_log("SpaceMouse 控制")
-            from .bgtask.spacemouse import SpaceMouseListener
             self.spacemouse_th = SpaceMouseListener()
             self.spacemouse_th.bind(on_data=self.spacemouse_cb, on_msg=self.add_log)
             self.add_th(self.TH_CTL_MODE, self.spacemouse_th, 1)
@@ -194,10 +194,28 @@ class MainWindow(qtbase.IMainWindow):
 
     @qtbase.Slot(dict)
     def spacemouse_cb(self, data: dict):
-        # print(f"{get_time_str(2)} data={data}")
-        # self.cmd2incr(data, data)
+        if self.is_going_to_init_pos:
+            print("正在返回初始位置，忽略")
+            return
+        
+        if VERBOSE:
+            print(f"{get_time_str(2)} data={data}")
         # 所有按键的数据都已同步
-        incr = SharedData.incr
+        incr_prev = SharedData.incr
+        
+        if data['gripper']:
+            self.set_gripper()
+            return
+        
+        if data['gozero']:
+            # self.arm.join(1)
+            self.arm.stop()
+            self.gozero()
+            return
+        
+        if data['collect']:
+            self.kb_collect()
+            return
         
         # 将 spacemouse 数据格式转为 incr 字典
         _incr = {}
@@ -208,8 +226,8 @@ class MainWindow(qtbase.IMainWindow):
         
         # 判断是否和之前的数值相同
         is_same = 1
-        for k in ['x','y','z','R','P','Y']:
-            if incr[k] != _incr[k]:
+        for k in SpaceMouseListener.POSE_KEYS:
+            if incr_prev[k] != _incr[k]:
                 is_same = 0
                 break
         
@@ -227,8 +245,9 @@ class MainWindow(qtbase.IMainWindow):
 
     def play(self):
         """执行任务理解逻辑"""
-        self.add_log("回到默认位置")
-        self.arm.goto_init_pos()
+        self.add_log("play")
+        # self.arm.goto_init_pos()
+        # self.spacemouse_th.btn2 = 1
 
     def kb_collect(self):
         # 开始收集
@@ -244,6 +263,16 @@ class MainWindow(qtbase.IMainWindow):
             self.set_op_cmd("")
             self.add_log("关闭数据采集模式")
             self.stop_th(self.TH_COLLECT)
+
+    def gozero(self):
+        """回到初始位置"""
+        self.add_log("G：回到初始位置")
+        if not self.is_going_to_init_pos:
+            self.add_log("正在回到初始位置中...")
+            self.is_going_to_init_pos = 1
+            self.arm.goto_init_pos()
+            self.is_going_to_init_pos = 0
+            self.add_log("机械臂已归位！")
 
     def cam_search(self):
         self.cam_s = qtbase.CameraSearcher()
@@ -406,13 +435,7 @@ class MainWindow(qtbase.IMainWindow):
                     return super().keyPressEvent(event)
                 
                 elif cmd == "goto_init_pos":
-                    self.add_log("G：回到初始位置")
-                    if not self.is_going_to_init_pos:
-                        self.add_log("正在回到初始位置中...")
-                        self.is_going_to_init_pos = 1
-                        self.arm.goto_init_pos()
-                        self.is_going_to_init_pos = 0
-                        self.add_log("机械臂已归位！")
+                    self.gozero()
                     return super().keyPressEvent(event)
                 
                 elif "+" in cmd or "-" in cmd:
@@ -429,14 +452,6 @@ class MainWindow(qtbase.IMainWindow):
             
             if self.VERBOSE:
                 print(f"{get_time_str(4)} keyPressEvent", incr)
-            
-            # patch
-            # if SharedData.keyboard_incr_bak != SharedData.keyboard_incr:
-                #print("-"*50)
-                #print("incr_bak", SharedData.keyboard_incr_bak)
-                #print("incr", SharedData.keyboard_incr)
-                #self.arm.cartesian_velocity_control(data)
-                # SharedData.keyboard_incr_bak.update(SharedData.keyboard_incr)
             self.arm.cartesian_velocity_control(incr)
 
         return super().keyPressEvent(event)
