@@ -269,6 +269,13 @@
               </property>
              </widget>
             </item>
+            <item>
+             <widget class="QCheckBox" name="is_mirror">
+              <property name="text">
+               <string>镜像操控模式</string>
+              </property>
+             </widget>
+            </item>
            </layout>
           </item>
           <item>

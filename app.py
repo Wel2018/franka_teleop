@@ -47,6 +47,7 @@ class MainWindow(qtbase.IMainWindow):
     is_keyboard_ctrl = 1  # 键盘控制开关
     is_collect_data = 0  # 数据集收集开关
     is_gripper_open = 1  # 当前夹爪状态
+    is_mirror = 0  # 是否镜像操控 
     is_debug = 0
     is_going_to_init_pos = 0
     VERBOSE = VERBOSE
@@ -86,6 +87,7 @@ class MainWindow(qtbase.IMainWindow):
         # 设置勾选状态
         self.set_check(ui.is_keyboard_ctrl, self.is_keyboard_ctrl)
         self.set_check(ui.is_collect_data, self.is_collect_data)
+        self.set_check(ui.is_mirror, self.is_mirror)
         self.set_check(ui.rb_keyboard, 1)
         
         # 勾选框glob
@@ -106,7 +108,7 @@ class MainWindow(qtbase.IMainWindow):
         self.rot_vel = ui.step_angle_vel.value()
         self.max_duration = 1000*60
         
-        # 在 lambda 表达式中不能使用赋值语句（=）。
+        # 在 lambda 表达式中不能使用赋值语句
         self.bind_val_changed(
             ui.step_posi_vel, 
             lambda val: \
@@ -223,6 +225,15 @@ class MainWindow(qtbase.IMainWindow):
             _incr[k] = data[k] if data[k] else 0
         for k in ['R','P','Y']:
             _incr[k] = data[k] if data[k] else 0
+        
+        # 镜像操作
+        if self.ui.is_mirror.isChecked():
+            _incr['x'] = -_incr['x']
+            _incr['y'] = -_incr['y']
+            #_incr['z'] = -_incr['z']
+            _incr['R'] = -_incr['R']
+            _incr['P'] = -_incr['P']
+            _incr['Y'] = -_incr['Y']
         
         # 判断是否和之前的数值相同
         is_same = 1

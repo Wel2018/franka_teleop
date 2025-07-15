@@ -200,6 +200,11 @@ class Ui_DemoWindow(object):
 
         self.horizontalLayout_4.addWidget(self.is_collect_data)
 
+        self.is_mirror = QCheckBox(self.centralwidget)
+        self.is_mirror.setObjectName(u"is_mirror")
+
+        self.horizontalLayout_4.addWidget(self.is_mirror)
+
 
         self.verticalLayout_2.addLayout(self.horizontalLayout_4)
 
@@ -389,6 +394,7 @@ class Ui_DemoWindow(object):
         self.rb_io.setText(QCoreApplication.translate("DemoWindow", u"IO \u52a8\u6355", None))
         self.is_keyboard_ctrl.setText(QCoreApplication.translate("DemoWindow", u"\u9065\u64cd\u4f5c\u4f7f\u80fd", None))
         self.is_collect_data.setText(QCoreApplication.translate("DemoWindow", u"\u91c7\u96c6\u8f68\u8ff9", None))
+        self.is_mirror.setText(QCoreApplication.translate("DemoWindow", u"\u955c\u50cf\u64cd\u63a7\u6a21\u5f0f", None))
         self.label_3.setText(QCoreApplication.translate("DemoWindow", u"\u63a7\u5236\u72b6\u6001", None))
 #if QT_CONFIG(statustip)
         self.ctl_state.setStatusTip(QCoreApplication.translate("DemoWindow", u"\u52fe\u9009\u9065\u64cd\u4f5c\u540e\u5728\u6b64\u663e\u793a\u63a7\u5236\u547d\u4ee4", None))
