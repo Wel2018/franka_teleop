@@ -144,7 +144,7 @@ class MainWindow(qtbase.IMainWindow):
         
         # 机械臂控制 --------------------
         self.arm = FrankaArmClient()
-        self.arm.gozero()
+        # self.arm.gozero()
         
         self.add_log("程序初始化完成")
         
@@ -451,6 +451,15 @@ class MainWindow(qtbase.IMainWindow):
                 
                 elif "+" in cmd or "-" in cmd:
                     self.cmd2incr(incr, cmd)
+                    
+                    # 镜像操作
+                    _incr = incr
+                    if self.ui.is_mirror.isChecked():
+                        _incr['x'] = -_incr['x']
+                        _incr['y'] = -_incr['y']
+                        _incr['R'] = -_incr['R']
+                        _incr['P'] = -_incr['P']
+                        _incr['Y'] = -_incr['Y']
                     SharedData.incr.update(incr)
                 else:
                     print(f"未定义 {key}")
