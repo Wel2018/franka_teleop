@@ -9,7 +9,17 @@ from .. import APPCFG
 class SpaceMouseListener(qtbase.QAsyncTask):
     """SpaceMouse 鼠标状态监听器，异步反馈控制状态
     
-    ### 注意
+    ### 说明
+    
+    > [!note]
+    > 注：已适配，无需修改底层代码
+    
+    ```python
+    # 推荐方法
+    SpaceMouseListener._d['设备型号].hid_id = [Vendor ID, Product ID]
+    spacemouse = SpaceMouseListener()
+    ```
+    
     
     - PySpaceMouse 中将设备号写死了，会导致检测不到设备
     - 空间鼠标使用 usb 接收器、蓝牙、有线三种方法连接时，Product ID 不同，需要修改
@@ -20,11 +30,12 @@ class SpaceMouseListener(qtbase.QAsyncTask):
     
     ### todo
     
-    - [ ] 支持侧键功能进行夹爪控制
+    - [x] 支持侧键功能进行夹爪控制
     
     ### 环境配置
     
-    - 下载 [PySpaceMouse](https://github.com/JakubAndrysek/PySpaceMouse) 并 `pip install -e .`
+    - 安装（推荐）：`pip install pyspacemouse`
+    - 源码安装 [PySpaceMouse](https://github.com/JakubAndrysek/PySpaceMouse) 并 `pip install -e .`
     - 使用 `lsusb` 查看设备 idVendor 和 idProduct
     
     ```
@@ -45,22 +56,26 @@ class SpaceMouseListener(qtbase.QAsyncTask):
     
     ### 支持设备
     
-    - 'SpaceMouse Enterprise', 9583, 50739
-    - 'SpaceExplorer', 1133, 50727
-    - 'SpaceNavigator', 1133, 50726
-    - 'SpaceMouse USB', 9583, 50753
-    - 'SpaceMouse Compact', 9583, 50741
-    - 'SpaceMouse Pro Wireless', 9583, 50738
-    - 'SpaceMouse Pro', 1133, 50731
-    - 'SpaceMouse Wireless', 9583, 50734
-    - 'SpaceMouse Wireless [NEW]', 9583, 50746
-    - '3Dconnexion Universal Receiver', 9583, 50770
-    - 'SpacePilot', 1133, 50725
-    - 'SpacePilot Pro', 1133, 50729
+    - SpaceMouse Enterprise
+    - SpaceExplorer
+    - SpaceNavigator
+    - SpaceMouse USB
+    - SpaceMouse Compact
+    - SpaceMouse Pro Wireless
+    - SpaceMouse Pro
+    - SpaceMouse Wireless
+    - SpaceMouse Wireless [NEW]
+    - 3Dconnexion Universal Receiver
+    - SpacePilot
+    - SpacePilot Pro
     """
     POSE_KEYS = ['x', 'y', 'z', 'R', 'P', 'Y']
+    # 需要根据实际连接方式，填写对应参数（三模鼠标每种模式都对应不同的 hid）
+    _d: dict[str, pyspacemouse.DeviceSpec] = pyspacemouse.device_specs
+    _d['SpaceMouse Pro Wireless'].hid_id = [0x256F, 0xC638]  # 有线
+    intv = 10  # ms
     
-    def __init__(self, conf: dict = {}):
+    def __init__(self, conf: dict = {}, devtype="SpaceMouse Pro Wireless"):
         super().__init__(conf)
         dev = pyspacemouse.open(
             # dof_callback=pyspacemouse.print_state,
@@ -79,25 +94,31 @@ class SpaceMouseListener(qtbase.QAsyncTask):
             "collect": 0,
         }
         # self.btn2 = 0
+        self.devtype = devtype
         
     def _get_button_state(self, state: pyspacemouse.SpaceNavigator):
-        _start_id = 5
-        btn1 = state.buttons[_start_id]
-        btn2 = state.buttons[_start_id+1]
-        btn3 = state.buttons[_start_id+2]
-        btn4 = state.buttons[_start_id+3]
-        return {
-            "gripper": btn1,  # [1] 用来控制夹爪开闭
-            "gozero": btn2,   # [2] 用来控制回到零位
-            "collect": btn3,  # [3] 用来控制数据录制开关
-            "custom": btn4,   # [4] 用来控制自定义功能
-        }
+        """获取鼠标按钮状态"""
+        if self.devtype == "SpaceMouse Pro Wireless":
+            _start_id = 5
+            btn1 = state.buttons[_start_id]
+            btn2 = state.buttons[_start_id+1]
+            btn3 = state.buttons[_start_id+2]
+            btn4 = state.buttons[_start_id+3]
+            return {
+                "gripper": btn1,  # [1] 用来控制夹爪开闭
+                "gozero": btn2,   # [2] 用来控制回到零位
+                "collect": btn3,  # [3] 用来控制数据录制开关
+                "custom": btn4,   # [4] 用来控制自定义功能
+            }
+        else:
+            raise NotImplementedError
     
     def _trigger_01(self, state: pyspacemouse.SpaceNavigator):
         """记录连续两帧的状态，当出现 0-1 跳变时触发控制信号"""
         btn_state = self._get_button_state(state)
     
-        def _impl(slot='gripper'):
+        def _trigger_01_impl(slot='gripper'):
+            # 通过计算当前帧与上一帧的状态，判断是否触发，然后记录当前状态再返回信号状态
             if self.sigs[slot] == 0 and btn_state[slot] == 1:
                 self.sigs[slot] = 1
                 return 1
@@ -107,9 +128,9 @@ class SpaceMouseListener(qtbase.QAsyncTask):
             return 0
     
         return {
-            "gripper": _impl('gripper'),
-            "gozero": _impl('gozero'),
-            "collect": _impl('collect'),
+            "gripper": _trigger_01_impl('gripper'),
+            "gozero": _trigger_01_impl('gozero'),
+            "collect": _trigger_01_impl('collect'),
         }
     
     
@@ -135,4 +156,4 @@ class SpaceMouseListener(qtbase.QAsyncTask):
             
             data.update(self._trigger_01(state))
             self.sig_data.emit(data)
-            time.sleep(0.01)
+            time.sleep(self.intv/1000)
