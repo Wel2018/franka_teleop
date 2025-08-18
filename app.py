@@ -8,7 +8,7 @@ from toolbox.qt import qtbase
 from .ui.ui_form import Ui_DemoWindow
 from toolbox.robot.robot_collect import FrankaCollector
 from .setting import SettingWindow
-from . import AppConfig, logger, VERBOSE, THREAD_DEBUG, APPCFG
+from . import AppConfig, logger, APPCFG
 from .bgtask.spacemouse import SpaceMouseListener
 
 
@@ -50,7 +50,7 @@ class MainWindow(qtbase.IMainWindow):
     is_mirror = 0  # 是否镜像操控 
     is_debug = 0
     is_going_to_init_pos = 0
-    VERBOSE = VERBOSE
+    VERBOSE = AppConfig.VERBOSE
 
     def __init__(self, parent = None):
         ui = self.ui = Ui_DemoWindow()
@@ -58,11 +58,9 @@ class MainWindow(qtbase.IMainWindow):
 
         # 初始化
         self.init(
-            confcache_name="franka_teleop",
-            apptitle=AppConfig.title,
             ui_logger=ui.txt_log,
             logger=logger,
-            fontsize=AppConfig.fontsize,
+            appcfg=AppConfig
         )
 
         # 子页面
@@ -135,7 +133,7 @@ class MainWindow(qtbase.IMainWindow):
         self.cam = load_cam3d(
             self.camtype, 
             camtypes_for_S_mode=APPCFG['camtypes_for_S_mode'],
-            is_start_and_warmup=1
+            is_start=1, is_warmup=1
         )
         self.robot_cam_th = qtbase.CameraTask(
             qtbase.Camera3DWrapper(self.cam))
@@ -200,7 +198,7 @@ class MainWindow(qtbase.IMainWindow):
             print("正在返回初始位置，忽略")
             return
         
-        if VERBOSE:
+        if AppConfig.VERBOSE:
             print(f"{get_time_str(2)} data={data}")
         # 所有按键的数据都已同步
         incr_prev = SharedData.incr

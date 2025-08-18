@@ -1,8 +1,8 @@
 """睿尔曼模仿学习客户端"""
-import os
+
 from toolbox.qt import qtbase
 from toolbox.core.logbase import get_logger
-from toolbox.core.file_op import yaml_load
+APPCFG = qtbase.get_appcfg(__file__)
 
 
 AppConfig = qtbase.QAppConfig(
@@ -10,16 +10,10 @@ AppConfig = qtbase.QAppConfig(
     name_en = "Franka Teleop",
     date="2025-07-11",
     version = "1.2.0",
-    fontsize = 14
+    fontsize = 14,
+    slot="franka_teleop",
+    appcfg=APPCFG,
 )
+
 print(f"AppConfig={AppConfig}")
-
-
-# 配置 -----------------------------------------------------------
-logger = get_logger(prefix="", name="franka_teleop")
-cur_dir = os.path.dirname(os.path.abspath(__file__))
-APPCFG = yaml_load(f"{cur_dir}/appcfg.yaml")
-print(f"APPCFG={APPCFG}")
-THREAD_DEBUG = APPCFG['THREAD_DEBUG']
-VERBOSE = APPCFG['VERBOSE']
-BENCHMARK = APPCFG['BENCHMARK']
+logger = get_logger(AppConfig.slot)
