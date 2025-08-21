@@ -8,8 +8,10 @@ from toolbox.qt import qtbase
 from .ui.ui_form import Ui_DemoWindow
 from toolbox.robot.robot_collect import FrankaCollector
 from .setting import SettingWindow
-from . import AppConfig, logger, APPCFG
+from . import q_appcfg, logger
 from .bgtask.spacemouse import SpaceMouseListener
+from toolbox.qt.tasks.camera_task import QTaskCamera
+from toolbox.cam3d.cam3d_base import Camera3DWrapper
 
 
 class SharedData:
@@ -34,7 +36,7 @@ class WorkMode:
     io = 3
 
 
-class MainWindow(qtbase.IMainWindow):
+class MainWindow(qtbase.QApp):
     """应用具体实现"""
     # 定时器和线程名称
     TH_COLLECT = "collect"
@@ -50,19 +52,15 @@ class MainWindow(qtbase.IMainWindow):
     is_mirror = 0  # 是否镜像操控 
     is_debug = 0
     is_going_to_init_pos = 0
-    VERBOSE = AppConfig.VERBOSE
+    VERBOSE = q_appcfg.VERBOSE
 
     def __init__(self, parent = None):
         ui = self.ui = Ui_DemoWindow()
-        super().__init__(ui, parent)
+        super().__init__(ui, parent, q_appcfg)
 
         # 初始化
-        self.init(
-            ui_logger=ui.txt_log,
-            logger=logger,
-            appcfg=AppConfig
-        )
-
+        self.init(ui_logger=ui.txt_log, logger=logger)
+        
         # 子页面
         self.setting_wd = SettingWindow(self)
         self.kb_mapp = self.setting_wd.keyboard_mapp
@@ -128,15 +126,16 @@ class MainWindow(qtbase.IMainWindow):
         self.pressed_keys = set()
         
         # 摄像头 --------------------
-        self.camtype = APPCFG['camtype']
+        self.camtype = q_appcfg.APPCFG_DICT['camtype']
+        camtypes=q_appcfg.APPCFG_DICT['camtypes_for_S_mode']
         from toolbox.cam3d import load_cam3d
         self.cam = load_cam3d(
             self.camtype, 
-            camtypes_for_S_mode=APPCFG['camtypes_for_S_mode'],
+            camtypes,
             is_start=1, is_warmup=1
         )
-        self.robot_cam_th = qtbase.CameraTask(
-            qtbase.Camera3DWrapper(self.cam))
+
+        self.robot_cam_th = QTaskCamera(Camera3DWrapper(self.cam))
         self.robot_cam_th.bind(on_data=self.get_obs)
         self.add_th(self.TH_CAM, self.robot_cam_th, 1)
         
@@ -198,7 +197,7 @@ class MainWindow(qtbase.IMainWindow):
             print("正在返回初始位置，忽略")
             return
         
-        if AppConfig.VERBOSE:
+        if q_appcfg.VERBOSE:
             print(f"{get_time_str(2)} data={data}")
         # 所有按键的数据都已同步
         incr_prev = SharedData.incr
@@ -284,8 +283,9 @@ class MainWindow(qtbase.IMainWindow):
             self.add_log("机械臂已归位！")
 
     def cam_search(self):
-        self.cam_s = qtbase.CameraSearcher()
-        self.cam_s.show()
+        from toolbox.qt import CameraSearcher
+        self.cam_searcher = CameraSearcher()
+        self.cam_searcher.show()
 
     def set_gripper(self):
         """夹爪控制"""
