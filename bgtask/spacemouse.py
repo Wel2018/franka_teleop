@@ -3,7 +3,7 @@
 import time
 import pyspacemouse
 from toolbox.qt import qtbase
-from .. import APPCFG
+from .. import q_appcfg
 
 
 class SpaceMouseListener(qtbase.QAsyncTask):
@@ -87,7 +87,7 @@ class SpaceMouseListener(qtbase.QAsyncTask):
             self.is_ok = 0
             print("空间鼠标未连接")
         self.is_run = 0
-        self.speed_ratio = APPCFG['spacemouse_speed_ratio']
+        self.speed_ratio = q_appcfg.APPCFG_DICT['spacemouse_speed_ratio']
         self.sigs = {
             "gripper": 0,
             "gozero": 0,
