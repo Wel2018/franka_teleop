@@ -41,8 +41,3 @@ pip install -r requirements.txt
 # 3、启动主程序
 python -m franka_teleop
 ```
-
-## TODO
-
-- [ ] iPhone 陀螺仪控制
-- [ ] 艾欧智能的遥操作设备控制
