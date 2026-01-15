@@ -3,12 +3,15 @@ import threading
 import numpy as np
 from rich import print
 from toolbox.core.time_op import get_time_str
-from toolbox.robot.franka_arm_client import FrankaArmClient
-from toolbox.qt import qtbase
+from toolbox.robot.arm.franka_http import FrankaArmHttpClient as FrankaArmClient
+from toolbox.qt import qtbase_future as qtbase
 from .ui.ui_form import Ui_DemoWindow
-from toolbox.robot.robot_collect import FrankaCollector
+from toolbox.robot.data.demo_collect import FrankaCollector
 from .setting import SettingWindow
-from . import q_appcfg, logger
+from . import q_appcfg
+from loguru import logger
+from toolbox.core.log import printc
+from toolbox.core.log import LogHelper
 from .bgtask.spacemouse import SpaceMouseListener
 from toolbox.qt.tasks.camera_task import QTaskCamera
 from toolbox.cam3d.cam3d_base import Camera3DWrapper
@@ -56,46 +59,47 @@ class MainWindow(qtbase.QApp):
 
     def __init__(self, parent = None):
         ui = self.ui = Ui_DemoWindow()
-        super().__init__(ui, parent, q_appcfg)
+        super().__init__(ui, parent)
 
-        # 初始化
-        self.init(ui_logger=ui.txt_log, logger=logger)
-        
+
+    def init_after(self):
+        self.set_main_app(q_appcfg)
+        ui = self.ui
         # 子页面
         self.setting_wd = SettingWindow(self)
         self.kb_mapp = self.setting_wd.keyboard_mapp
 
         # 绑定点击事件
-        self.bind_clicked(ui.btn_setting, lambda: self.setting_wd.showNormal())
-        self.bind_clicked(ui.btn_clear, self.clean_log)
-        self.bind_clicked(ui.btn_gripper, self.set_gripper)
-        self.bind_clicked(ui.btn_open_dir, lambda: self.open_dir(self.ui.dataset_dir.text()))
-        self.bind_clicked(ui.btn_play, self.play)
+        qtbase.bind_clicked(ui.btn_setting, lambda: self.setting_wd.showNormal())
+        # qtbase.bind_clicked(ui.btn_clear, self.clean_log)
+        qtbase.bind_clicked(ui.btn_gripper, self.set_gripper)
+        # qtbase.bind_clicked(ui.btn_open_dir, lambda: self.open_dir(self.ui.dataset_dir.text()))
+        qtbase.bind_clicked(ui.btn_play, self.play)
 
         # 工具栏
         # self.set_icon(ui.act_setting, "data/assets/setting.svg")
-        self.bind_action(ui.act_setting, lambda: self.setting_wd.showNormal())
+        qtbase.bind_action(ui.act_setting, lambda: self.setting_wd.showNormal())
 
         # 添加按钮图标
         # self.set_app_icon("data/assets/franky.svg")
         # qtbase.QGuiOperate.label_set(ui.msg, "styled", "0")
 
         # 设置勾选状态
-        self.set_check(ui.is_keyboard_ctrl, self.is_keyboard_ctrl)
-        self.set_check(ui.is_collect_data, self.is_collect_data)
-        self.set_check(ui.is_mirror, self.is_mirror)
-        self.set_check(ui.rb_keyboard, 1)
+        qtbase.set_check(ui.is_keyboard_ctrl, self.is_keyboard_ctrl)
+        qtbase.set_check(ui.is_collect_data, self.is_collect_data)
+        qtbase.set_check(ui.is_mirror, self.is_mirror)
+        qtbase.set_check(ui.rb_keyboard, 1)
         
         # 勾选框glob
-        self.bind_checked(ui.is_keyboard_ctrl, self.keyboard_ctl)
-        self.bind_checked(ui.is_collect_data, self.collect_data)
+        qtbase.bind_checked(ui.is_keyboard_ctrl, self.keyboard_ctl)
+        qtbase.bind_checked(ui.is_collect_data, self.collect_data)
         
         # 监听工作模式选择
         for rb in [ui.rb_keyboard, ui.rb_spacemouse, ui.rb_iphone, ui.rb_io]:
             rb.clicked.connect(self.ctl_mode_changed)
         # 默认工作模式
-        self.set_enable(ui.rb_iphone, 0)
-        self.set_enable(ui.rb_io, 0)
+        qtbase.set_enable(ui.rb_iphone, 0)
+        qtbase.set_enable(ui.rb_io, 0)
         self.mode = WorkMode.keyboard
         
         # 遥操作控制步长改变
@@ -105,13 +109,13 @@ class MainWindow(qtbase.QApp):
         self.max_duration = 1000*60
         
         # 在 lambda 表达式中不能使用赋值语句
-        self.bind_val_changed(
+        qtbase.bind_val_changed(
             ui.step_posi_vel, 
             lambda val: \
                 setattr(self, 'pos_vel', round(val,3))
         )
         
-        self.bind_val_changed(
+        qtbase.bind_val_changed(
             ui.step_angle_vel, 
             lambda val: \
                 setattr(self, 'rot_vel', round(val,3))
@@ -143,7 +147,7 @@ class MainWindow(qtbase.QApp):
         self.arm = FrankaArmClient()
         # self.arm.gozero()
         
-        self.add_log("程序初始化完成")
+        self.print("程序初始化完成")
         
         # 检查服务器是否能够正常连接
         self.add_timer(self.TIMER_ROBOT_STATE, 100, self.refresh_state, 1)
@@ -167,26 +171,26 @@ class MainWindow(qtbase.QApp):
         self.is_collect_data = 0
         mode = self.get_ctl_mode()
         if mode == self.mode:
-            self.add_log("请点击不同工作模式")
+            self.print("请点击不同工作模式")
             return
         
         # 停止之前的任务线程
-        self.stop_th(self.TH_CTL_MODE)
+        self.rm_th(self.TH_CTL_MODE)
         
         if mode == WorkMode.keyboard:
-            self.add_log("键盘控制")
+            self.print("键盘控制")
             
         elif mode == WorkMode.spacemouse:
-            self.add_log("SpaceMouse 控制")
+            self.print("SpaceMouse 控制")
             self.spacemouse_th = SpaceMouseListener()
-            self.spacemouse_th.bind(on_data=self.spacemouse_cb, on_msg=self.add_log)
+            self.spacemouse_th.bind(on_data=self.spacemouse_cb, on_msg=self.print)
             self.add_th(self.TH_CTL_MODE, self.spacemouse_th, 1)
         
         elif mode == WorkMode.iphone:
-            self.add_log("iPhone 控制 [暂不支持]")
+            self.print("iPhone 控制 [暂不支持]")
         
         elif mode == WorkMode.io:
-            self.add_log("IO 控制 [暂不支持]")
+            self.print("IO 控制 [暂不支持]")
         else:
             raise ValueError("未知控制模式 [暂不支持]")
         self.mode = mode
@@ -247,13 +251,13 @@ class MainWindow(qtbase.QApp):
             "is_async": 1,
         })
         # print(f"{get_time_str(2)} {_incr}")
-        self.arm.cartesian_velocity_control(_incr)
+        self.arm._cartesian_velocity_control(_incr)
         SharedData.incr.update(_incr)
         
 
     def play(self):
         """执行任务理解逻辑"""
-        self.add_log("play")
+        self.print("play")
         # self.arm.goto_init_pos()
         # self.spacemouse_th.btn2 = 1
 
@@ -262,25 +266,25 @@ class MainWindow(qtbase.QApp):
         if self.is_collect_data == 0:
             self.is_collect_data = 1
             self.set_op_cmd("collect")
-            self.add_log("开启数据采集模式")
+            self.print("开启数据采集模式")
             self.robot_collect = FrankaCollector(self.cam, self.arm, use_kb_incr=1, incr=SharedData.incr)
-            self.robot_collect.bind(on_msg=self.add_log)
+            self.robot_collect.bind(on_msg=self.print)
             self.add_th(self.TH_COLLECT, self.robot_collect, 1)
         else:
             self.is_collect_data = 0
             self.set_op_cmd("")
-            self.add_log("关闭数据采集模式")
-            self.stop_th(self.TH_COLLECT)
+            self.print("关闭数据采集模式")
+            self.rm_th(self.TH_COLLECT)
 
     def gozero(self):
         """回到初始位置"""
-        self.add_log("G：回到初始位置")
+        self.print("G：回到初始位置")
         if not self.is_going_to_init_pos:
-            self.add_log("正在回到初始位置中...")
+            self.print("正在回到初始位置中...")
             self.is_going_to_init_pos = 1
-            self.arm.goto_init_pos()
+            self.arm.gozero()
             self.is_going_to_init_pos = 0
-            self.add_log("机械臂已归位！")
+            self.print("机械臂已归位！")
 
     def cam_search(self):
         from toolbox.qt import CameraSearcher
@@ -291,10 +295,10 @@ class MainWindow(qtbase.QApp):
         """夹爪控制"""
         self.is_gripper_open = not self.is_gripper_open
         if self.is_gripper_open:
-            self.add_log("打开夹爪")
+            self.print("打开夹爪")
             self.arm.gripper_open()
         else:
-            self.add_log("关闭夹爪")
+            self.print("关闭夹爪")
             self.arm.gripper_close()
             
 
@@ -327,10 +331,10 @@ class MainWindow(qtbase.QApp):
         #state: 0 未勾选, 1 半勾选, 2 勾选
         if state == 2:
             self.is_keyboard_ctrl = 1
-            self.add_log("开启遥操作模式")
+            self.print("开启遥操作模式")
         else:
             self.is_keyboard_ctrl = 0
-            self.add_log("关闭遥操作模式")
+            self.print("关闭遥操作模式")
         
     def collect_data(self, state):
         self.kb_collect()
@@ -470,7 +474,7 @@ class MainWindow(qtbase.QApp):
             
             if self.VERBOSE:
                 print(f"{get_time_str(4)} keyPressEvent", incr)
-            self.arm.cartesian_velocity_control(incr)
+            self.arm._cartesian_velocity_control(incr)
 
         return super().keyPressEvent(event)
     
@@ -513,9 +517,9 @@ class MainWindow(qtbase.QApp):
             if len(self.pressed_keys) == 0:
                 if self.VERBOSE:
                     print(f"{get_time_str(4)} 无按键，停止运动")
-                self.arm.stop_cartesian_velocity_control()
+                self.arm._stop_cartesian_velocity_control()
             else:
-                self.arm.cartesian_velocity_control(incr)
+                self.arm._cartesian_velocity_control(incr)
         # return super().keyPressEvent(event)
 
     def set_ctl_cmd(self, cmd: str):
@@ -542,6 +546,8 @@ class MainWindow(qtbase.QApp):
     
     
 def main():
+    LogHelper.init(q_appcfg.slot)
+    printc(f"{q_appcfg}")
     qapp = qtbase.QApplication(sys.argv)
     # 设置全局默认字体
     qapp.setFont(qtbase.QFont("微软雅黑", 11))

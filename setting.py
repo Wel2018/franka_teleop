@@ -1,4 +1,5 @@
-from . import logger
+
+from toolbox.core.log import printc
 from .ui.ui_setting import Ui_SettingWindow
 from toolbox.qt import qtbase
 
@@ -106,7 +107,7 @@ class SettingWindow(qtbase.QApp):
             self.keyboard_mapp[f'+{key}'] = el.text() # type: ignore
             el = getattr(ui, f"sub_{key}")
             self.keyboard_mapp[f'-{key}'] = el.text() # type: ignore
-        logger.info(f"绑定快捷键 {self.keyboard_mapp}")
+        printc(f"绑定快捷键 {self.keyboard_mapp}")
         # 其他 -----------------------
         self.keyboard_mapp['gripper'] = ui.gripper.text() # type: ignore
 

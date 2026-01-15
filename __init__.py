@@ -1,18 +1,16 @@
 """睿尔曼模仿学习客户端"""
 
 from toolbox.qt import qtbase
-from toolbox.core.logbase import get_logger
+from .version import __version__
+from .version import __update_timestamp__
 
 
 q_appcfg = qtbase.QAppConfig(
     name = "Franka 遥操作数据采集程序",
     name_en = "Franka Teleop",
-    date="2025-08-21",
-    version = "1.3.0",
+    date=__update_timestamp__,
+    version = __version__,
     fontsize = 14,
     slot="franka_teleop",
     APPCFG_DICT=qtbase.get_appcfg(__file__),
 )
-
-print(f"q_appcfg={q_appcfg}")
-logger = get_logger(q_appcfg.slot)
